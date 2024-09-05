@@ -1,0 +1,79 @@
+27 results - 3 files
+
+application\views\themes\classic\cart.php:
+  251                                              <?php 
+  252:                                             if(trim(strtolower($_COOKIE['tableOption'] ?? 'Pickup')) == trim(strtolower($shipment->shipping_method))) {
+  253                                              ?>
+
+  397      document.addEventListener("DOMContentLoaded", function() {
+  398:         getcheckbox($(document).find("input[data-value='"+"<?php  echo trim(strtolower($_COOKIE['tableOption'] ?? 'Pickup'))?>"+"']").attr("data-rate"),'<?php echo  trim(strtolower($_COOKIE['tableOption'] ?? 'Pickup')) ;?>');
+  399      });
+
+application\views\themes\classic\cartlist.php:
+  199                                  <input <?php
+  200:                                 if (trim(strtolower($_COOKIE['tableOption'] ?? 'Pickup')) == trim(strtolower($shipment->shipping_method))) {
+  201                                      ?> checked <?php } ?>
+
+  414      document.addEventListener("DOMContentLoaded", function () {
+  415:         getcheckbox($(document).find("input[data-value='" + "<?php echo trim(strtolower($_COOKIE['tableOption'] ?? 'Pickup')) ?>" + "']").attr("data-rate"), '<?php echo trim(strtolower($_COOKIE['tableOption'] ?? 'Pickup')); ?>');
+  416      });
+
+application\views\themes\classic\home.php:
+   21  
+   22: <div class="modal fade" id="tableoption" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+   23      <div class="modal-dialog" role="document">
+
+   31              <div class="modal-body">
+   32:                     <a class="dropdown-item table-option catef" href="<?php echo base_url('menu')?>" data-toggle="modal"  data-name="Dine-in" data-target="#tableoptionConfirm">Dining In</a>
+   33:                     <a class="dropdown-item table-option catef" href="<?php echo base_url('menu')?>" data-toggle="modal"  data-name="Pickup" data-target="#tableoption11">Pick-Up</a>
+   34:                     <a class="dropdown-item table-option catef" href="<?php echo base_url('menu')?>" data-toggle="modal"  data-name="Home Delivary" data-target="#tableoption11">Delivery</a>
+   35              </div>
+
+   38  </div>
+   39: <div class="modal fade" id="tableoption11" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+   40      <div class="modal-dialog" role="document">
+
+   60  
+   61: <div class="modal fade" id="tableoption12" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+   62      <div class="modal-dialog" role="document">
+
+   86  ?>
+   87: <div class="modal fade" id="tableoptionConfirm" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+   88      <div class="modal-dialog" role="document">
+
+  163                              <div class="home-cat especial">
+  164:                             <button type="button" class="btn btn-primary category" data-toggle="modal" data-id="<?php echo $value->CategoryID; ?>" onClick="updateModel('<?php echo $value->Name; ?>', '<?php echo $value->CategoryID; ?>')" data-name="<?php echo $value->Name; ?>" data-target="#tableoption"><?php echo $value->Name; ?></button>
+  165                                  
+
+  313  
+  314:             // if (dishElement.attr('data-target') == '#tableoption12') {
+  315:             //     dishElement.attr('data-target', '#tableoption11');
+  316              // }
+
+  321  
+  322:                     if (dishElement.attr('data-target') == '#tableoption11') {
+  323:                         dishElement.attr('data-target', '#tableoption12');
+  324                      }
+
+  327                  else if(dishmain == "especial"){ 
+  328:                     if (dishElement.attr('data-target') == '#tableoption12') {
+  329:                         dishElement.attr('data-target', '#tableoption11');
+  330                      }
+
+  342      $(this).parents().find('.close').click()
+  343:     var tableOption = $(this).data('name');
+  344:     $.cookie('tableOption', tableOption, { expires: 1, path: '/' });
+  345  });
+
+  364  
+  365:        // $('#tableoptionConfirm').modal('hide');
+  366:         //$('#tableoption11').modal('show');
+  367  
+
+  389                  if(data.status === true){
+  390:                     $("#tableoptionConfirm").modal('hide');
+  391                      
+
+  398                          $("#code").val('');
+  399:                         $("#tableoption"+condition).modal('show');
+  400                      }
