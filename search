@@ -1,1 +1,396 @@
-Votre email existe déjà !!! Veuillez essayer de vous connecter ou utiliser une autre adresse e-mail !!!
+public function placeorder()
+	{
+		if ($this->webinfo->web_onoff == 0) {
+			redirect(base_url() . 'login');
+			exit;
+		}
+
+		$memail = $this->input->post('email', TRUE);
+		$emailexists = $this->db->select("*")->from('customer_info')->where('customer_email', $memail)->get()->row();
+		$islogin = $this->session->userdata('CusUserID');
+		if (empty($islogin)) {
+			if (!empty($emailexists)) {
+				$this->session->set_flashdata('exception', 'Votre email existe déjà !!! Veuillez essayer de vous connecter ou utiliser une autre adresse e-mail !!!');
+				redirect('checkout');
+				exit;
+			}
+			$coa = $this->hungry_model->headcode();
+			if ($coa->HeadCode != NULL) {
+				$headcode = $coa->HeadCode + 1;
+			} else {
+				$headcode = "102030101";
+			}
+			$lastid = $this->db->select("*")->from('customer_info')->order_by('cuntomer_no', 'desc')->get()->row();
+			$sl = $lastid->cuntomer_no;
+			if (empty($sl)) {
+				$sl = "cus-0001";
+			} else {
+				$sl = $sl;
+			}
+			$supno = explode('-', $sl);
+			$nextno = $supno[1] + 1;
+			$si_length = strlen((int) $nextno);
+
+			$str = '0000';
+			$cutstr = substr($str, $si_length);
+			$sino = $supno[0] . "-" . $cutstr . $nextno;
+			$scan = scandir('application/modules/');
+			$pointsys = "";
+			foreach ($scan as $file) {
+				if ($file == "loyalty") {
+					if (file_exists(APPPATH . 'modules/' . $file . '/assets/data/env')) {
+						$pointsys = 1;
+					}
+				}
+			}
+			//insert Customer
+			$user['cuntomer_no'] = $sino;
+			$user['membership_type'] = $pointsys;
+			$user['password'] = md5($this->input->post('password'));
+			$user['customer_name'] = $this->input->post('f_name') . " " . $this->input->post('l_name');
+			$user['customer_email'] = $this->input->post('email');
+			$user['customer_phone'] = $this->input->post('phone');
+			$user['customer_address'] = $this->input->post('billing_address_1');
+			$user['favorite_delivery_address'] = $this->input->post('billing_address_1');
+			$user['crdate'] = date('Y-m-d');
+			$user['is_active'] = 1;
+			$customerid = $this->hungry_model->insert_data('customer_info', $user);
+			if (!empty($pointsys)) {
+				$pointstable = array(
+					'customerid' => $customerid,
+					'amount' => 0,
+					'points' => 10
+				);
+				$this->hungry_model->insert_data('tbl_customerpoint', $pointstable);
+			}
+			//insert Coa for Customer Receivable
+			$c_name = $this->input->post('f_name') . " " . $this->input->post('l_name');
+			$c_acc = $sino . '-' . $c_name;
+			$createdate = date('Y-m-d H:i:s');
+			$postData1['HeadCode'] = $headcode;
+			$postData1['HeadName'] = $c_acc;
+			$postData1['PHeadName'] = 'Customer Receivable';
+			$postData1['HeadLevel'] = '4';
+			$postData1['IsActive'] = '1';
+			$postData1['IsTransaction'] = '1';
+			$postData1['IsGL'] = '0';
+			$postData1['HeadType'] = 'A';
+			$postData1['IsBudget'] = '0';
+			$postData1['IsDepreciation'] = '0';
+			$postData1['DepreciationRate'] = '0';
+			$postData1['CreateBy'] = $customerid;
+			$postData1['CreateDate'] = $createdate;
+			$this->hungry_model->insert_data('acc_coa', $postData1);
+
+			$mysesdata = array('CusUserID' => $customerid);
+			$this->session->set_userdata($mysesdata);
+		} else {
+			$customerid = $islogin;
+		}
+		//Order insert
+		$newdate = date('Y-m-d');
+		$lastorderid = $this->db->select("*")->from('customer_order')->order_by('order_id', 'desc')->get()->row();
+		$ordsl = $lastorderid->order_id;
+		if (empty($ordsl)) {
+			$ordsl = 1;
+		} else {
+			$ordsl = $ordsl + 1;
+		}
+		$ordsi_length = strlen((int) $ordsl);
+		$ordstr = '0000';
+		$cutordstr = substr($ordstr, $ordsi_length);
+		$ordsino = $cutordstr . $ordsl;
+
+		$todaydate = date('Y-m-d');
+		$todaystoken = $this->db->select("*")->from('customer_order')->where('order_date', $todaydate)->order_by('order_id', 'desc')->get()->row();
+		if (empty($todaystoken)) {
+			$mytoken = 1;
+		} else {
+			$mytoken = $todaystoken->tokenno + 1;
+		}
+		$isvatinclusive = $this->db->select("*")->from('setting')->get()->row();
+		if ($isvatinclusive->isvatinclusive == 1) {
+			$Grandtotal = $this->input->post('grandtotal') - $this->input->post('vat');
+		} else {
+			$Grandtotal = $this->input->post('grandtotal');
+		}
+
+		$token_length = strlen((int) $mytoken);
+		$tokenstr = '00';
+		$newtoken = substr($tokenstr, $token_length);
+		$tokenno = $newtoken . $mytoken;
+		$shippingdate = $this->session->userdata('orderdate') . ' ' . $this->session->userdata('ordertime') . ':00';
+		$orderinfo['customer_id'] = $customerid;
+		$orderinfo['saleinvoice'] = $ordsino;
+		$orderinfo['cutomertype'] = 2;
+		$orderinfo['waiter_id'] = '';
+		$orderinfo['order_date'] = $newdate;
+		$orderinfo['order_time'] = date('H:i:s');
+		$orderinfo['totalamount'] = $Grandtotal;
+		$orderinfo['shipping_date'] = $shippingdate;
+		$orderinfo['table_no'] = 0;
+		$orderinfo['tokenno'] = $tokenno;
+		$orderinfo['customer_note'] = $this->input->post('ordre_notes');
+		$orderinfo['order_status'] = 1;
+		$orderid = $this->hungry_model->insert_data('customer_order', $orderinfo);
+
+		$taxinfos = $this->taxchecking();
+		if (!empty($taxinfos)) {
+			$multitaxvalue = $this->input->post('multiplletaxvalue');
+			$multitaxvaluedata = unserialize($multitaxvalue);
+			$inserttaxarray = array(
+				'customer_id' => $customerid,
+				'relation_id' => $orderid,
+				'date' => $newdate
+			);
+			$inserttaxdata = array_merge($inserttaxarray, $multitaxvaluedata);
+			$this->db->insert('tax_collection', $inserttaxdata);
+		}
+		//coupon record
+		if (!empty($this->session->userdata('couponcode'))) {
+			$coupon['orderid'] = $orderid;
+			$coupon['couponcode'] = $this->session->userdata('couponcode');
+			$coupon['couponrate'] = $this->session->userdata('couponprice');
+			;
+			$this->hungry_model->insert_data('usedcoupon', $coupon);
+		}
+		$product_ids = $this->input->post('product_ids');
+		$quantities = $this->input->post('quantities');
+		if ($product_ids && $quantities) {
+        	// Call the model function to update item quantities
+        	$result=$this->hungry_model->update_item_quantities($product_ids, $quantities);
+
+    	}
+		//insert bill for online customer
+		$bill['orderid'] = $orderid;
+		$bill['firstname'] = $this->input->post('f_name');
+		$bill['lastname'] = $this->input->post('l_name');
+		$bill['companyname'] = $this->input->post('c_name');
+		$bill['country'] = $this->input->post('country');
+		$bill['email'] = $this->input->post('email');
+		$bill['address'] = $this->input->post('billing_address_1');
+		$bill['city'] = $this->input->post('town');
+		$bill['district'] = $this->input->post('district');
+		$bill['zip'] = $this->input->post('postcode');
+		$bill['phone'] = $this->input->post('phone');
+		$bill['DateInserted'] = date('Y-m-d H:i:s');
+		$this->hungry_model->insert_data('tbl_billingaddress', $bill);
+
+
+		$isdiffship = $this->input->post('isdiffship');
+		//insert ship for online customer
+		$ship['orderid'] = $orderid;
+		$ship['firstname'] = $this->input->post('f_name3');
+		$ship['lastname'] = $this->input->post('l_name2');
+		$ship['companyname'] = $this->input->post('c_name2');
+		$ship['country'] = $this->input->post('country2');
+		$ship['email'] = $this->input->post('email2');
+		$ship['address'] = $this->input->post('billing_address_3');
+		$ship['city'] = $this->input->post('town2');
+		$ship['district'] = $this->input->post('district2');
+		$ship['zip'] = $this->input->post('postcode2');
+		$ship['phone'] = $this->input->post('phone2');
+		$ship['DateInserted'] = date('Y-m-d H:i:s');
+		if (!empty($isdiffship)) {
+			$this->hungry_model->insert_data('tbl_shippingaddress', $ship);
+		} else {
+			$this->hungry_model->insert_data('tbl_shippingaddress', $bill);
+		}
+
+
+		//Order transaction
+		$paymentsatus = $this->input->post('card_type');
+		if ($this->hungry_model->orderitem($orderid, $customerid)) {
+			$this->session->set_flashdata('message', display('order_successfully_placed'));
+
+			try {
+				$this->printInvoice($orderid);
+			} catch (Exception $e) {
+				//echo "Error: " . $e->getMessage();
+			}
+			$getseting = $this->db->select("storename,email")->from('setting')->get()->row();
+			$ToEmail = $this->input->post('email', TRUE);
+			$htmlContent = SendorderEmail($orderid, $customerid);
+			$send_email = $this->hungry_model->read('*', 'email_config', array('email_config_id' => 1));
+			$config = array(
+				'protocol' => $send_email->protocol,
+				'smtp_host' => $send_email->smtp_host,
+				'smtp_port' => $send_email->smtp_port,
+				'smtp_user' => $send_email->sender,
+				'smtp_pass' => $send_email->smtp_password,
+				'mailtype' => $send_email->mailtype,
+				'charset' => 'utf-8'
+			);
+
+			$this->load->library('email');
+			$this->email->initialize($config);
+			$this->email->set_newline("\r\n");
+			$this->email->set_mailtype("html");
+			$this->email->from($send_email->sender, $getseting->storename);
+			$this->email->to($ToEmail);
+			$this->email->subject('Confirmation de commande');
+			$this->email->message($htmlContent);
+			$this->email->send();
+
+			$this->cart->destroy();
+			$this->session->unset_userdata('shippingmethod');
+			$this->session->unset_userdata('shippingrate');
+			$this->session->unset_userdata('couponcode');
+			$this->session->unset_userdata('couponprice');
+			/*Push Notification*/
+			$condition = "user.waiter_kitchenToken!='' AND employee_history.pos_id=6";
+			$this->db->select('user.*,employee_history.emp_his_id,employee_history.employee_id,employee_history.pos_id ');
+			$this->db->from('user');
+			$this->db->join('employee_history', 'employee_history.emp_his_id = user.id', 'left');
+			$this->db->where($condition);
+			$query = $this->db->get();
+			$allemployee = $query->result();
+			$senderid = array();
+			foreach ($allemployee as $mytoken) {
+				$senderid[] = $mytoken->waiter_kitchenToken;
+			}
+			$newmsg = array(
+				'tag' => "incoming_request",
+				'orderid' => "875765",
+				'amount' => "200"
+			);
+			$message = json_encode($newmsg);
+			define('API_ACCESS_KEY', 'AAAAqG0NVRM:APA91bExey2V18zIHoQmCkMX08SN-McqUvI4c3CG3AnvkRHQp8S9wKn-K4Vb9G79Rfca8bQJY9pn-tTcWiXYJiqe2s63K6QHRFqIx4Oaj9MoB1uVqB7U_gNT9fiqckeWge8eVB9P5-rX');
+			$registrationIds = $senderid;
+			$msg = array(
+				'message' => "New Order Placed",
+				'title' => "TSET",
+				'subtitle' => "TSET",
+				'tickerText' => "TSET",
+				'vibrate' => 1,
+				'sound' => 1,
+				'largeIcon' => "TSET",
+				'smallIcon' => "TSET"
+			);
+			$fields2 = array(
+				'registration_ids' => $registrationIds,
+				'data' => $msg
+			);
+
+			$headers2 = array(
+				'Authorization: key=' . API_ACCESS_KEY,
+				'Content-Type: application/json'
+			);
+
+			$ch2 = curl_init();
+			curl_setopt($ch2, CURLOPT_URL, 'https://fcm.googleapis.com/fcm/send');
+			curl_setopt($ch2, CURLOPT_POST, true);
+			curl_setopt($ch2, CURLOPT_HTTPHEADER, $headers2);
+			curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+			curl_setopt($ch2, CURLOPT_SSL_VERIFYPEER, false);
+			curl_setopt($ch2, CURLOPT_POSTFIELDS, json_encode($fields2));
+			$result2 = curl_exec($ch2);
+			curl_close($ch2);
+			/*End Notification*/
+			if ($paymentsatus == 5) {
+				redirect('hungry/paymentgateway/' . $orderid . '/' . $paymentsatus . '/2');
+			} else if ($paymentsatus == 8) {
+				redirect('hungry/payments/' . $orderid . '/2');
+			} else if ($paymentsatus == 9) {
+				redirect('hungry/stripe/' . $orderid . '/2');
+			} else if ($paymentsatus == 10) {
+				$paymentinfo = $this->hungry_model->read('*', 'paymentsetup', array('paymentid' => 10));
+				$nittotal = $this->input->post('grandtotal') * 100;
+				echo '<form>
+  <script src="https://js.paystack.co/v1/inline.js"></script>
+  <button type="button" onclick="payWithPaystack()" id="paytrack" style="display:none;"> Payer </button> 
+</form>
+<script>
+document.getElementById("paytrack").click();
+  function payWithPaystack(){
+    var handler = PaystackPop.setup({
+      key: "' . $paymentinfo->password . '",
+      email: "' . $paymentinfo->email . '",
+      amount: "' . round($nittotal) . '",
+      currency: "NGN",
+      ref: ""+Math.floor((Math.random() * 1000000000) + 1), // generates a pseudo-unique reference. Please replace with a reference you generated. Or remove the line entirely so our API will generate one for you
+      metadata: {
+         custom_fields: [
+            {
+                display_name: "Numéro de téléphone",
+                variable_name: "mobile_number",
+                value: "+2348012345678"
+            }
+         ]
+      },
+      callback: function(response){
+		  window.location.href="' . base_url() . 'hungry/successful/' . $orderid . '/2";
+      },
+      onClose: function(){
+           window.location.href="' . base_url() . 'menu";
+      }
+    });
+    handler.openIframe();
+  }
+</script>';
+			} else if ($paymentsatus == 11) {
+				redirect('hungry/paytm/' . $orderid . '/2');
+			} else if ($paymentsatus == 12) {
+				redirect('hungry/orange/' . $orderid . '/2');
+			} else if ($paymentsatus == 6) {
+				redirect('hungry/paymentgateway/' . $orderid . '/' . $paymentsatus . '/2');
+			} else if ($paymentsatus == 7) {
+				redirect('hungry/paymentgateway/' . $orderid . '/' . $paymentsatus . '/2');
+			} else if ($paymentsatus == 3) {
+				redirect('hungry/paymentgateway/' . $orderid . '/' . $paymentsatus . '/2');
+			} else if ($paymentsatus == 2) {
+				redirect('hungry/paymentgateway/' . $orderid . '/' . $paymentsatus . '/2');
+			} else if ($paymentsatus == 13) {
+				redirect('hungry/iyzico_paymentgateway/' . $orderid . '/' . $paymentsatus . '/2');
+			} else {
+				if ($paymentsatus != 4 && $paymentsatus != 1) {
+					//dynamic payment moduls
+					$modules_name = $this->db->select('*')->from('payment_method')->where('payment_method_id', $paymentsatus)->get()->row();
+					$checkmodule = $this->db->select('*')->from('module')->where('directory', $modules_name->modulename)->where('status', 1)->get()->num_rows();
+					if ($checkmodule == 1) {
+						redirect($modules_name->modulename . '/' . $modules_name->modulename . '/payment_submit/' . $orderid . '/' . $paymentsatus . '/2');
+					} else {
+						$this->session->set_flashdata('exception', display('please_try_again'));
+						redirect('menu');
+					}
+				}
+				$scan = scandir('application/modules/');
+				$getcus = "";
+				foreach ($scan as $file) {
+					if ($file == "loyalty") {
+						if (file_exists(APPPATH . 'modules/' . $file . '/assets/data/env')) {
+							$getcus = $customerid;
+						}
+					}
+				}
+
+				$totalgrtotal = round($this->input->post('grandtotal'));
+				if (!empty($getcus)) {
+					$isexitscusp = $this->db->select("*")->from('tbl_customerpoint')->where('customerid', $customerid)->get()->row();
+					if (empty($isexitscusp)) {
+						$pointstable2 = array(
+							'customerid' => $customerid,
+							'amount' => "",
+							'points' => 10
+						);
+						$this->hungry_model->insert_data('tbl_customerpoint', $pointstable2);
+					}
+				}
+				$WhatsApp = $this->db->where('directory', 'whatsapp')->where('status', 1)->get('module');
+				$whatsapp_count = $WhatsApp->num_rows();
+				if ($whatsapp_count == 1) {
+					$wtapp = $this->db->select('*')->from('whatsapp_settings')->get()->row();
+					if ($wtapp->orderenable == 1) {
+						redirect('orderdelevered/' . $orderid);
+					} else {
+						redirect('menu/');
+					}
+				} else {
+					redirect('menu');
+				}
+			}
+		} else {
+			$this->session->set_flashdata('exception', display('please_try_again'));
+			redirect('menu');
+		}
+	}
